@@ -5,17 +5,17 @@ import ProjectGallery from './components/ProjectGallery'
 const starterProjects = [
   {
     id: 1,
-    title: 'Budget Buddy',
+    title: 'Budget planner',
     description: 'A simple expense tracker with category charts and monthly summaries.',
   },
   {
     id: 2,
-    title: 'Study Sprint',
+    title: 'Study planner',
     description: 'A focused timer app with tasks and streak tracking for study sessions.',
   },
   {
     id: 3,
-    title: 'Recipe Radar',
+    title: 'Recipe Maker',
     description: 'Search and save favorite recipes with tags and difficulty filters.',
   },
 ]
