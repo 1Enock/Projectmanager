@@ -43,9 +43,6 @@ export default function App() {
           <h1 className="text-xl font-bold tracking-tight text-slate-900">
             My Project Showcase
           </h1>
-          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
-            {projects.length} project{projects.length !== 1 ? 's' : ''}
-          </span>
         </div>
       </header>
 
