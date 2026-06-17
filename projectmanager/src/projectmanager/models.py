@@ -7,6 +7,8 @@ from typing import Any
 
 from dateutil.parser import parse as parse_date
 
+from .storage import DataStorage
+
 
 @dataclass
 class User:
@@ -109,7 +111,7 @@ class ProjectTracker:
         self._load()
 
     def _load(self) -> None:
-        storage = Storage(self.data_path)
+        storage = DataStorage(self.data_path)
         raw = storage.load()
         self.users = {
             uid: User.from_dict(item)
@@ -128,7 +130,7 @@ class ProjectTracker:
         self.next_task_id = int(raw.get("next_task_id", 1))
 
     def _save(self) -> None:
-        storage = Storage(self.data_path)
+        storage = DataStorage(self.data_path)
         storage.save({
             "users": {uid: user.to_dict() for uid, user in self.users.items()},
             "projects": {pid: project.to_dict() for pid, project in self.projects.items()},
