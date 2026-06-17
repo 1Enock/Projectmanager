@@ -1,0 +1,29 @@
+{
+  "users": {
+    "u0001": {"user_id": "u0001", "name": "Alice", "email": "alice@example.com"},
+    "u0002": {"user_id": "u0002", "name": "Bob", "email": "bob@example.com"}
+  },
+  "projects": {
+    "p0001": {
+      "project_id": "p0001",
+      "name": "Demo Project",
+      "description": "A sample project",
+      "owner_user_ids": ["u0001"],
+      "task_ids": ["t0001"]
+    }
+  },
+  "tasks": {
+    "t0001": {
+      "task_id": "t0001",
+      "title": "Initial task",
+      "description": "Set up repo",
+      "project_id": "p0001",
+      "assigned_user_id": "u0002",
+      "due_date": "2026-12-31",
+      "status": "pending"
+    }
+  },
+  "next_user_id": 3,
+  "next_project_id": 2,
+  "next_task_id": 2
+}
