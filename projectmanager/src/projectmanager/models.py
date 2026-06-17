@@ -1,108 +1,263 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from dateutil.parser import parse as parse_date
 
 
-TASK_STATUSES = {"todo", "in_progress", "done"}
-
-
-def parse_due_date(value: str | None) -> str | None:
-    if value is None or value == "":
-        return None
-    parsed = parse_date(value)
-    return parsed.date().isoformat()
-
-
 @dataclass
 class User:
-    id: int
+    user_id: str
     name: str
+    email: str
 
-    def to_dict(self) -> dict[str, Any]:
-        return {"id": self.id, "name": self.name}
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "user_id": self.user_id,
+            "name": self.name,
+            "email": self.email,
+        }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "User":
-        return cls(id=int(data["id"]), name=str(data["name"]))
+    def from_dict(cls, data: dict[str, Any]) -> User:
+        return cls(
+            user_id=str(data["user_id"]),
+            name=str(data["name"]),
+            email=str(data["email"]),
+        )
 
 
 @dataclass
 class Task:
-    id: int
+    task_id: str
     title: str
-    status: str = "todo"
+    description: str
+    project_id: str
+    assigned_user_id: str | None = None
     due_date: str | None = None
-
-    def __post_init__(self) -> None:
-        if self.status not in TASK_STATUSES:
-            raise ValueError(f"Invalid task status: {self.status}")
-        if self.due_date is not None:
-            self.due_date = parse_due_date(self.due_date)
+    status: str = "pending"
 
     def to_dict(self) -> dict[str, Any]:
-        return {"id": self.id, "title": self.title, "status": self.status, "due_date": self.due_date}
+        return {
+            "task_id": self.task_id,
+            "title": self.title,
+            "description": self.description,
+            "project_id": self.project_id,
+            "assigned_user_id": self.assigned_user_id,
+            "due_date": self.due_date,
+            "status": self.status,
+        }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Task":
+    def from_dict(cls, data: dict[str, Any]) -> Task:
         return cls(
-            id=int(data["id"]),
+            task_id=str(data["task_id"]),
             title=str(data["title"]),
-            status=str(data.get("status", "todo")),
-            due_date=data.get("due_date"),
+            description=str(data.get("description", "")),
+            project_id=str(data["project_id"]),
+            assigned_user_id=(str(data["assigned_user_id"]) if data.get("assigned_user_id") else None),
+            due_date=(str(data["due_date"]) if data.get("due_date") else None),
+            status=str(data.get("status", "pending")),
         )
+
+    def due_date_object(self) -> datetime | None:
+        if not self.due_date:
+            return None
+        return parse_date(self.due_date)
 
 
 @dataclass
 class Project:
-    id: int
+    project_id: str
     name: str
-    description: str = ""
-    user_id: int | None = None
-    tasks: list[Task] = field(default_factory=list)
+    description: str
+    owner_user_ids: list[str] = field(default_factory=list)
+    task_ids: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "id": self.id,
+            "project_id": self.project_id,
             "name": self.name,
             "description": self.description,
-            "user_id": self.user_id,
-            "tasks": [task.to_dict() for task in self.tasks],
+            "owner_user_ids": self.owner_user_ids,
+            "task_ids": self.task_ids,
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Project":
-        tasks = [Task.from_dict(item) for item in data.get("tasks", [])]
+    def from_dict(cls, data: dict[str, Any]) -> Project:
         return cls(
-            id=int(data["id"]),
+            project_id=str(data["project_id"]),
             name=str(data["name"]),
             description=str(data.get("description", "")),
-            user_id=data.get("user_id"),
-            tasks=tasks,
+            owner_user_ids=[str(uid) for uid in data.get("owner_user_ids", [])],
+            task_ids=[str(tid) for tid in data.get("task_ids", [])],
         )
 
 
-@dataclass
-class DataSchema:
-    users: list[User] = field(default_factory=list)
-    projects: list[Project] = field(default_factory=list)
+class ProjectTracker:
+    def __init__(self, data_path: Path) -> None:
+        self.data_path = data_path
+        self.users: dict[str, User] = {}
+        self.projects: dict[str, Project] = {}
+        self.tasks: dict[str, Task] = {}
+        self.next_user_id = 1
+        self.next_project_id = 1
+        self.next_task_id = 1
+        self._load()
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "users": [user.to_dict() for user in self.users],
-            "projects": [project.to_dict() for project in self.projects],
+    def _load(self) -> None:
+        storage = Storage(self.data_path)
+        raw = storage.load()
+        self.users = {
+            uid: User.from_dict(item)
+            for uid, item in raw.get("users", {}).items()
         }
+        self.projects = {
+            pid: Project.from_dict(item)
+            for pid, item in raw.get("projects", {}).items()
+        }
+        self.tasks = {
+            tid: Task.from_dict(item)
+            for tid, item in raw.get("tasks", {}).items()
+        }
+        self.next_user_id = int(raw.get("next_user_id", 1))
+        self.next_project_id = int(raw.get("next_project_id", 1))
+        self.next_task_id = int(raw.get("next_task_id", 1))
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "DataSchema":
-        return cls(
-            users=[User.from_dict(item) for item in data.get("users", [])],
-            projects=[Project.from_dict(item) for item in data.get("projects", [])],
+    def _save(self) -> None:
+        storage = Storage(self.data_path)
+        storage.save({
+            "users": {uid: user.to_dict() for uid, user in self.users.items()},
+            "projects": {pid: project.to_dict() for pid, project in self.projects.items()},
+            "tasks": {tid: task.to_dict() for tid, task in self.tasks.items()},
+            "next_user_id": self.next_user_id,
+            "next_project_id": self.next_project_id,
+            "next_task_id": self.next_task_id,
+        })
+
+    def _next_id(self, prefix: str, counter: int) -> str:
+        return f"{prefix}{counter:04d}"
+
+    def create_user(self, name: str, email: str) -> User:
+        user_id = self._next_id("u", self.next_user_id)
+        self.next_user_id += 1
+        user = User(user_id=user_id, name=name, email=email)
+        self.users[user_id] = user
+        self._save()
+        return user
+
+    def list_users(self) -> list[User]:
+        return list(self.users.values())
+
+    def get_user(self, user_id: str) -> User | None:
+        return self.users.get(user_id)
+
+    def create_project(self, name: str, description: str, owner_user_ids: list[str] | None = None) -> Project:
+        owner_user_ids = owner_user_ids or []
+        project_id = self._next_id("p", self.next_project_id)
+        self.next_project_id += 1
+        project = Project(project_id=project_id, name=name, description=description, owner_user_ids=owner_user_ids)
+        self.projects[project_id] = project
+        self._save()
+        return project
+
+    def get_project(self, project_id: str) -> Project | None:
+        return self.projects.get(project_id)
+
+    def list_projects(self) -> list[Project]:
+        return list(self.projects.values())
+
+    def assign_project_to_user(self, project_id: str, user_id: str) -> Project | None:
+        project = self.get_project(project_id)
+        if project and user_id not in project.owner_user_ids:
+            project.owner_user_ids.append(user_id)
+            self._save()
+        return project
+
+    def search_projects_by_user(self, user_id: str) -> list[Project]:
+        return [project for project in self.projects.values() if user_id in project.owner_user_ids]
+
+    def create_task(
+        self,
+        title: str,
+        description: str,
+        project_id: str,
+        assigned_user_id: str | None = None,
+        due_date: str | None = None,
+    ) -> Task:
+        task_id = self._next_id("t", self.next_task_id)
+        self.next_task_id += 1
+        task = Task(
+            task_id=task_id,
+            title=title,
+            description=description,
+            project_id=project_id,
+            assigned_user_id=assigned_user_id,
+            due_date=due_date,
         )
+        self.tasks[task_id] = task
+        project = self.get_project(project_id)
+        if project:
+            project.task_ids.append(task_id)
+        self._save()
+        return task
 
-    def to_json(self) -> str:
-        return json.dumps(self.to_dict(), indent=2)
+    def list_tasks(self, project_id: str | None = None) -> list[Task]:
+        if project_id:
+            return [task for task in self.tasks.values() if task.project_id == project_id]
+        return list(self.tasks.values())
+
+    def get_task(self, task_id: str) -> Task | None:
+        return self.tasks.get(task_id)
+
+    def update_task_status(self, task_id: str, status: str) -> Task | None:
+        task = self.get_task(task_id)
+        if task:
+            task.status = status
+            self._save()
+        return task
+
+    def assign_task(self, task_id: str, user_id: str) -> Task | None:
+        task = self.get_task(task_id)
+        if task:
+            task.assigned_user_id = user_id
+            self._save()
+        return task
+
+    def delete_user(self, user_id: str) -> bool:
+        if user_id not in self.users:
+            return False
+        del self.users[user_id]
+        for project in self.projects.values():
+            project.owner_user_ids = [uid for uid in project.owner_user_ids if uid != user_id]
+        for task in self.tasks.values():
+            if task.assigned_user_id == user_id:
+                task.assigned_user_id = None
+        self._save()
+        return True
+
+    def delete_project(self, project_id: str) -> bool:
+        project = self.projects.pop(project_id, None)
+        if not project:
+            return False
+        for task_id in project.task_ids:
+            self.tasks.pop(task_id, None)
+        self._save()
+        return True
+
+    def delete_task(self, task_id: str) -> bool:
+        task = self.tasks.pop(task_id, None)
+        if not task:
+            return False
+        project = self.get_project(task.project_id)
+        if project:
+            project.task_ids = [tid for tid in project.task_ids if tid != task_id]
+        self._save()
+        return True
+
+
+class Storage(DataStorage):
+    pass
