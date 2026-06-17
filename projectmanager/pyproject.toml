@@ -1,0 +1,18 @@
+[project]
+name = "projectmanager"
+version = "0.1.0"
+description = "A CLI app for managing users, projects, and tasks with local JSON persistence."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.1",
+    "rich>=13.0",
+    "python-dateutil>=2.9"
+]
+
+[project.scripts]
+project-manager = "projectmanager.cli:main"
+
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
